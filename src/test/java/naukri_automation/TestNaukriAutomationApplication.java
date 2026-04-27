@@ -1,4 +1,4 @@
-package naukri_automation;
+/*package naukri_automation;
 
 import org.springframework.boot.SpringApplication;
 
@@ -8,4 +8,4 @@ public class TestNaukriAutomationApplication {
 		SpringApplication.from(NaukriAutomationApplication::main).with(TestcontainersConfiguration.class).run(args);
 	}
 
-}
+}*/

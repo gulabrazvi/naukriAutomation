@@ -13,7 +13,7 @@ public class UpdateScheduler {
     @Autowired
     private NaukriService naukriService;
 
-    @Scheduled(cron = "0 0 10 * * ?") // daily 10 AM
+    @Scheduled(cron = "0 0 8 * * ?", zone = "Asia/Kolkata") // daily 8 AM
     public void autoUpdate() {
 
         UserAccount user = new UserAccount("email", "password");

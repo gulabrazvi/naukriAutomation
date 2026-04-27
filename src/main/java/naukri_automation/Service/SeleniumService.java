@@ -3,11 +3,11 @@ package naukri_automation.Service;
 import io.github.bonigarcia.wdm.WebDriverManager;
 import org.openqa.selenium.*;
 import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.support.ui.*;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
-import java.util.List;
 
 @Service
 public class SeleniumService {
@@ -16,129 +16,105 @@ public class SeleniumService {
 
         WebDriverManager.chromedriver().setup();
 
-        WebDriver driver = new ChromeDriver();
+        ChromeOptions options = new ChromeOptions();
+        options.addArguments("--disable-notifications");
+
+        WebDriver driver = new ChromeDriver(options);
         WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(30));
+        JavascriptExecutor js = (JavascriptExecutor) driver;
 
         try {
 
-            // =========================
-            // STEP 1: LOGIN
-            // =========================
+            // ================= LOGIN =================
             driver.get("https://www.naukri.com/nlogin/login");
 
             wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("usernameField")))
                     .sendKeys(email);
 
-            wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("passwordField")))
-                    .sendKeys(password);
+            driver.findElement(By.id("passwordField")).sendKeys(password);
 
-            wait.until(ExpectedConditions.elementToBeClickable(
-                    By.xpath("//button[@type='submit']")
-            )).click();
+            driver.findElement(By.xpath("//button[@type='submit']")).click();
 
             Thread.sleep(5000);
 
             if (driver.getCurrentUrl().contains("login")) {
-                throw new RuntimeException("Login Failed");
+                throw new RuntimeException("❌ Login Failed");
             }
 
-            // =========================
-            // STEP 2: PROFILE PAGE
-            // =========================
+            System.out.println("✅ Login Success");
+
+            // ================= PROFILE =================
             driver.get("https://www.naukri.com/mnjuser/profile");
 
-            WebElement editBtn = wait.until(
+            // ================= OPEN RESUME UPDATE =================
+            WebElement updateLink = wait.until(
                     ExpectedConditions.elementToBeClickable(
-                            By.xpath("//span[text()='Key skills']/following-sibling::span[contains(@class,'edit')]")
+                            By.xpath("//span[text()='Resume']/following::a[text()='Update']")
                     )
             );
 
-            JavascriptExecutor js = (JavascriptExecutor) driver;
+            js.executeScript("arguments[0].click();", updateLink);
+            System.out.println("Resume Update opened ✅");
 
-            js.executeScript("arguments[0].scrollIntoView(true);", editBtn);
-            Thread.sleep(2000);
-            js.executeScript("arguments[0].click();", editBtn);
+            Thread.sleep(3000);
 
-            System.out.println("Edit clicked ✅");
-
-            // =========================
-            // STEP 3: READ SKILLS
-            // =========================
-            List<WebElement> skills = wait.until(
-                    ExpectedConditions.visibilityOfAllElementsLocatedBy(
-                            By.xpath("//span[contains(@class,'chip')]")
-                    )
-            );
-
-            boolean hasJwt = false;
-
-            for (WebElement skill : skills) {
-                if (skill.getText().trim().equalsIgnoreCase("Jwt")) {
-                    hasJwt = true;
-                }
-            }
-
-            // =========================
-            // STEP 4: REMOVE FIRST SKILL
-            // =========================
-            WebElement removeBtn = skills.get(0).findElement(
-                    By.xpath("./following-sibling::span")
-            );
-
-            js.executeScript("arguments[0].click();", removeBtn);
-
-            // =========================
-            // STEP 5: ADD SKILL (FIXED)
-            // =========================
-            WebElement inputBox = wait.until(
-                    ExpectedConditions.visibilityOfElementLocated(
-                            By.xpath("//input[contains(@placeholder,'Add')]")
-                    )
-            );
-
-            inputBox.click();
-
-            String skillToAdd = hasJwt ? "SOAP" : "Jwt";
-
-            System.out.println("Adding: " + skillToAdd);
-
-            inputBox.sendKeys(skillToAdd);
-
-            // 🔥 FINAL FIX: flexible dropdown selection
+            // ================= DELETE RESUME =================
             try {
-                WebElement suggestion = wait.until(
-                        ExpectedConditions.visibilityOfElementLocated(
-                                By.xpath("//*[contains(text(),'" + skillToAdd + "')]")
+                WebElement deleteIcon = wait.until(
+                        ExpectedConditions.elementToBeClickable(
+                                By.xpath("//i[@data-title='delete-resume']")
                         )
                 );
-                suggestion.click();
+
+                js.executeScript("arguments[0].click();", deleteIcon);
+                System.out.println("🗑 Delete icon clicked");
+
+                // 🔥 WAIT FOR MODAL
+                WebElement modal = wait.until(
+                        ExpectedConditions.visibilityOfElementLocated(
+                                By.xpath("//div[contains(@class,'confirmationBox')]")
+                        )
+                );
+
+                // 🔥 FIND DELETE BUTTON INSIDE MODAL ONLY
+                WebElement deleteBtn = modal.findElement(
+                        By.xpath(".//button[text()='Delete']")
+                );
+
+                wait.until(ExpectedConditions.elementToBeClickable(deleteBtn));
+
+                js.executeScript("arguments[0].click();", deleteBtn);
+
+                System.out.println("✅ Resume Deleted");
+
             } catch (Exception e) {
-                // fallback
-                inputBox.sendKeys(Keys.DOWN);
-                inputBox.sendKeys(Keys.ENTER);
+                System.out.println("⚠️ No resume to delete");
             }
 
-            // =========================
-            // STEP 6: CONFIRM SKILL ADDED
-            // =========================
-            wait.until(ExpectedConditions.presenceOfElementLocated(
-                    By.xpath("//span[contains(@class,'chip') and text()='" + skillToAdd + "']")
-            ));
+            Thread.sleep(3000);
 
-            Thread.sleep(2000);
-
-            // =========================
-            // STEP 7: SAVE
-            // =========================
-            WebElement saveBtn = wait.until(
-                    ExpectedConditions.elementToBeClickable(By.id("saveKeySkills"))
+            // ================= UPLOAD RESUME =================
+            WebElement fileInput = wait.until(
+                    ExpectedConditions.presenceOfElementLocated(
+                            By.xpath("//input[@type='file']")
+                    )
             );
 
-            js.executeScript("arguments[0].scrollIntoView(true);", saveBtn);
-            Thread.sleep(2000);
-            js.executeScript("arguments[0].click();", saveBtn);
+            // 🔥 MAKE INPUT VISIBLE
+            js.executeScript(
+                    "arguments[0].style.display='block'; arguments[0].style.visibility='visible';",
+                    fileInput
+            );
 
-            System.out.println("✅ DONE SUCCESS");
+            String filePath = "D:\\R\\Md_Gulab_Jdev_2.1_YoE_Resume.pdf";
+
+            fileInput.sendKeys(filePath);
+
+            System.out.println("📤 Resume Uploaded");
+
+            Thread.sleep(5000);
+
+            System.out.println("✅ Profile Updated Successfully");
 
         } catch (Exception e) {
             e.printStackTrace();
